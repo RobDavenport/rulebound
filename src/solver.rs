@@ -121,6 +121,11 @@ impl<const W: usize> Solver<W> {
         &self.domains
     }
 
+    /// Restore domains from a previous snapshot (for external backtracking).
+    pub fn restore_domains(&mut self, domains: Vec<Domain<W>>) {
+        self.domains = domains;
+    }
+
     /// Check if all variables are solved (singleton domains).
     pub fn is_solved(&self) -> bool {
         self.domains.iter().all(|d| d.is_singleton())
