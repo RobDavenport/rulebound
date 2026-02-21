@@ -32,7 +32,20 @@ impl<const W: usize> Constraint<W> for NotEqual {
     }
 
     fn propagate(&self, domains: &mut [Domain<W>]) -> Result<(), Contradiction> {
-        todo!()
+        let [a, b] = self.scope;
+        if let Some(v) = domains[a].singleton_value() {
+            domains[b].remove(v);
+            if domains[b].is_empty() {
+                return Err(Contradiction { variable: b });
+            }
+        }
+        if let Some(v) = domains[b].singleton_value() {
+            domains[a].remove(v);
+            if domains[a].is_empty() {
+                return Err(Contradiction { variable: a });
+            }
+        }
+        Ok(())
     }
 }
 
@@ -75,6 +88,45 @@ impl<const W: usize> Constraint<W> for LessThan {
 
     fn propagate(&self, domains: &mut [Domain<W>]) -> Result<(), Contradiction> {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate std;
+    use super::*;
+
+    #[test]
+    fn not_equal_propagates_singleton() {
+        // A={3}, B={1,2,3} → B should lose 3
+        let mut domains = [const { Domain::<1>::empty() }; 2];
+        domains[0].insert(3);
+        domains[1] = Domain::full(4); // {0,1,2,3}
+        let c = NotEqual::new(0, 1);
+        c.propagate(&mut domains).unwrap();
+        assert!(!domains[1].contains(3));
+        assert!(domains[1].contains(0));
+        assert!(domains[1].contains(1));
+        assert!(domains[1].contains(2));
+    }
+
+    #[test]
+    fn not_equal_contradiction() {
+        // A={5}, B={5} → contradiction
+        let mut domains = [const { Domain::<1>::empty() }; 2];
+        domains[0].insert(5);
+        domains[1].insert(5);
+        let c = NotEqual::new(0, 1);
+        assert!(c.propagate(&mut domains).is_err());
+    }
+
+    #[test]
+    fn not_equal_no_op_when_no_singleton() {
+        let mut domains: [Domain<1>; 2] = core::array::from_fn(|_| Domain::full(5));
+        let c = NotEqual::new(0, 1);
+        c.propagate(&mut domains).unwrap();
+        assert_eq!(domains[0].count(), 5);
+        assert_eq!(domains[1].count(), 5);
     }
 }
 
