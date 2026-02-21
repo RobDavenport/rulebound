@@ -66,7 +66,21 @@ impl<const W: usize> Constraint<W> for AllDifferent {
     }
 
     fn propagate(&self, domains: &mut [Domain<W>]) -> Result<(), Contradiction> {
-        todo!()
+        for i in 0..self.variables.len() {
+            let vi = self.variables[i];
+            if let Some(val) = domains[vi].singleton_value() {
+                for j in 0..self.variables.len() {
+                    if i != j {
+                        let vj = self.variables[j];
+                        domains[vj].remove(val);
+                        if domains[vj].is_empty() {
+                            return Err(Contradiction { variable: vj });
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -127,6 +141,36 @@ mod tests {
         c.propagate(&mut domains).unwrap();
         assert_eq!(domains[0].count(), 5);
         assert_eq!(domains[1].count(), 5);
+    }
+
+    #[test]
+    fn all_different_removes_singleton_values() {
+        // 3 vars: {1,2,3}, assign var0=1 → var1,var2 lose 1
+        let mut domains = alloc::vec![Domain::<1>::empty(); 3];
+        for d in domains.iter_mut() {
+            d.insert(1); d.insert(2); d.insert(3);
+        }
+        domains[0] = Domain::empty();
+        domains[0].insert(1); // singleton
+        let c = AllDifferent::new(&[0, 1, 2]);
+        c.propagate(&mut domains).unwrap();
+        assert!(!domains[1].contains(1));
+        assert!(!domains[2].contains(1));
+        assert!(domains[1].contains(2));
+        assert!(domains[1].contains(3));
+    }
+
+    #[test]
+    fn all_different_cascade_two_singletons() {
+        // var0={1}, var1={2}, var2={1,2,3} → var2={3}
+        let mut domains = alloc::vec![Domain::<1>::empty(); 3];
+        domains[0].insert(1);
+        domains[1].insert(2);
+        domains[2].insert(1); domains[2].insert(2); domains[2].insert(3);
+        let c = AllDifferent::new(&[0, 1, 2]);
+        c.propagate(&mut domains).unwrap();
+        assert_eq!(domains[2].count(), 1);
+        assert!(domains[2].contains(3));
     }
 }
 
