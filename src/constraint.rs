@@ -257,6 +257,33 @@ mod tests {
         assert!(domains[0].contains(0));
         assert!(domains[0].contains(1));
     }
+
+    #[test]
+    fn implication_fires_when_triggered() {
+        // If A=2, then B in {0, 3}. A={2}, B={0,1,2,3} → B={0,3}
+        let mut domains = [const { Domain::<1>::empty() }; 2];
+        domains[0].insert(2);
+        let mut allowed_b = Domain::<1>::empty();
+        allowed_b.insert(0); allowed_b.insert(3);
+        domains[1] = Domain::full(4); // {0,1,2,3}
+        let c = Implication::new(0, 2, 1, allowed_b);
+        c.propagate(&mut domains).unwrap();
+        assert_eq!(domains[1].count(), 2);
+        assert!(domains[1].contains(0));
+        assert!(domains[1].contains(3));
+    }
+
+    #[test]
+    fn implication_no_op_when_not_triggered() {
+        // A={1,2}, val_a=2. A is not singleton, so no action.
+        let mut domains = [const { Domain::<1>::empty() }; 2];
+        domains[0].insert(1); domains[0].insert(2);
+        domains[1] = Domain::full(4);
+        let allowed_b = Domain::<1>::empty();
+        let c = Implication::<1>::new(0, 2, 1, allowed_b);
+        c.propagate(&mut domains).unwrap();
+        assert_eq!(domains[1].count(), 4); // unchanged
+    }
 }
 
 /// Exactly N variables in scope must take a specific value.
@@ -389,6 +416,14 @@ impl<const W: usize> Constraint<W> for Implication<W> {
     }
 
     fn propagate(&self, domains: &mut [Domain<W>]) -> Result<(), Contradiction> {
-        todo!()
+        let [a, b] = self.scope;
+        // Only fire if A is singleton and equals val_a
+        if domains[a].is_singleton() && domains[a].contains(self.val_a) {
+            domains[b].intersect_with(&self.allowed_b);
+            if domains[b].is_empty() {
+                return Err(Contradiction { variable: b });
+            }
+        }
+        Ok(())
     }
 }
