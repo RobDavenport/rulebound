@@ -30,6 +30,7 @@ pub struct Solver<const W: usize = 2> {
     constraints: Vec<Box<dyn Constraint<W>>>,
     propagator: Propagator,
     config: SolverConfig,
+    last_propagated: usize,
 }
 
 impl<const W: usize> Solver<W> {
@@ -41,6 +42,7 @@ impl<const W: usize> Solver<W> {
             constraints: Vec::new(),
             propagator: Propagator::new(),
             config,
+            last_propagated: 0,
         }
     }
 
@@ -55,6 +57,7 @@ impl<const W: usize> Solver<W> {
         self.domains[variable].insert(value);
         let refs: Vec<&dyn Constraint<W>> = self.constraints.iter().map(|c| &**c).collect();
         self.propagator.propagate(&mut self.domains, &refs)?;
+        self.last_propagated = self.constraints.len();
         Ok(())
     }
 
@@ -62,12 +65,23 @@ impl<const W: usize> Solver<W> {
     pub fn propagate(&mut self) -> Result<bool, Contradiction> {
         let refs: Vec<&dyn Constraint<W>> = self.constraints.iter().map(|c| &**c).collect();
         self.propagator.propagate(&mut self.domains, &refs)?;
+        self.last_propagated = self.constraints.len();
         Ok(self.is_solved())
     }
 
     /// Run incremental propagation after adding new constraints.
     pub fn propagate_incremental(&mut self) -> Result<bool, Contradiction> {
-        todo!()
+        if self.last_propagated >= self.constraints.len() {
+            return Ok(self.is_solved());
+        }
+        let changed_vars: Vec<usize> = self.constraints[self.last_propagated..]
+            .iter()
+            .flat_map(|c| c.scope().iter().copied())
+            .collect();
+        let refs: Vec<&dyn Constraint<W>> = self.constraints.iter().map(|c| &**c).collect();
+        self.propagator.propagate_incremental(&mut self.domains, &refs, &changed_vars)?;
+        self.last_propagated = self.constraints.len();
+        Ok(self.is_solved())
     }
 
     /// Full solve: propagation + backtracking search.
@@ -263,5 +277,19 @@ mod tests {
         solver.add_constraint(crate::constraint::AllDifferent::new(&[0, 1, 2]));
         let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
         assert!(solver.solve(&mut rng).is_err());
+    }
+
+    #[test]
+    fn propagate_incremental_after_new_constraint() {
+        let mut solver = Solver::<1>::new(3, 3, SolverConfig::default());
+        solver.add_constraint(NotEqual::new(0, 1));
+        solver.assign(0, 1).unwrap();
+        // Now add another constraint and use incremental
+        solver.add_constraint(NotEqual::new(1, 2));
+        solver.assign(2, 2).unwrap();
+        let solved = solver.propagate_incremental().unwrap();
+        // var1 lost 1 (from first assign) and lost 2 (from second), only 0 left
+        assert_eq!(solver.domain(1).singleton_value(), Some(0));
+        assert!(solved);
     }
 }
