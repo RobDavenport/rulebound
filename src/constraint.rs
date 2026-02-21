@@ -215,6 +215,32 @@ mod tests {
         let c = LessThan::new(0, 1);
         assert!(c.propagate(&mut domains).is_err());
     }
+
+    #[test]
+    fn exactly_n_forces_remaining() {
+        // 3 vars, exactly 2 must be value 1. var0={1}, var1={0}, var2={0,1}
+        // var0 already has 1, var1 can't have 1, so var2 must have 1
+        let mut domains = alloc::vec![Domain::<1>::empty(); 3];
+        domains[0].insert(1);
+        domains[1].insert(0);
+        domains[2].insert(0); domains[2].insert(1);
+        let c = ExactlyN::new(&[0, 1, 2], 1, 2);
+        c.propagate(&mut domains).unwrap();
+        assert!(domains[2].contains(1));
+    }
+
+    #[test]
+    fn exactly_n_removes_when_count_met() {
+        // 3 vars, exactly 1 must be value 5. var0={5}. → var1,var2 lose 5.
+        let mut domains = alloc::vec![Domain::<1>::empty(); 3];
+        domains[0].insert(5);
+        domains[1].insert(5); domains[1].insert(6);
+        domains[2].insert(5); domains[2].insert(7);
+        let c = ExactlyN::new(&[0, 1, 2], 5, 1);
+        c.propagate(&mut domains).unwrap();
+        assert!(!domains[1].contains(5));
+        assert!(!domains[2].contains(5));
+    }
 }
 
 /// Exactly N variables in scope must take a specific value.
@@ -236,7 +262,50 @@ impl<const W: usize> Constraint<W> for ExactlyN {
     }
 
     fn propagate(&self, domains: &mut [Domain<W>]) -> Result<(), Contradiction> {
-        todo!()
+        let val = self.value;
+        let mut must_count = 0usize;  // singletons that ARE val
+        let mut can_count = 0usize;   // non-singletons that contain val
+
+        for &v in &self.variables {
+            if domains[v].is_singleton() && domains[v].contains(val) {
+                must_count += 1;
+            } else if domains[v].contains(val) {
+                can_count += 1;
+            }
+        }
+
+        if must_count > self.count {
+            return Err(Contradiction { variable: self.variables[0] });
+        }
+
+        if must_count + can_count < self.count {
+            return Err(Contradiction { variable: self.variables[0] });
+        }
+
+        // If count already met, remove val from all non-singleton vars
+        if must_count == self.count {
+            for &v in &self.variables {
+                if !domains[v].is_singleton() {
+                    domains[v].remove(val);
+                    if domains[v].is_empty() {
+                        return Err(Contradiction { variable: v });
+                    }
+                }
+            }
+        }
+
+        // If remaining slots == remaining candidates, force them all
+        let remaining_needed = self.count - must_count;
+        if remaining_needed == can_count {
+            for &v in &self.variables {
+                if !domains[v].is_singleton() && domains[v].contains(val) {
+                    domains[v] = Domain::empty();
+                    domains[v].insert(val);
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
