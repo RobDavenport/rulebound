@@ -101,7 +101,27 @@ impl<const W: usize> Constraint<W> for LessThan {
     }
 
     fn propagate(&self, domains: &mut [Domain<W>]) -> Result<(), Contradiction> {
-        todo!()
+        let [a, b] = self.scope;
+
+        // A must be < max(B): remove values from A that are >= max(B)
+        if let Some(max_b) = domains[b].iter().last() {
+            let to_remove: alloc::vec::Vec<usize> = domains[a].iter().filter(|&v| v >= max_b).collect();
+            for v in to_remove { domains[a].remove(v); }
+        } else {
+            return Err(Contradiction { variable: b });
+        }
+
+        // B must be > min(A): remove values from B that are <= min(A)
+        if let Some(min_a) = domains[a].min_value() {
+            let to_remove: alloc::vec::Vec<usize> = domains[b].iter().filter(|&v| v <= min_a).collect();
+            for v in to_remove { domains[b].remove(v); }
+        } else {
+            return Err(Contradiction { variable: a });
+        }
+
+        if domains[a].is_empty() { return Err(Contradiction { variable: a }); }
+        if domains[b].is_empty() { return Err(Contradiction { variable: b }); }
+        Ok(())
     }
 }
 
@@ -171,6 +191,29 @@ mod tests {
         c.propagate(&mut domains).unwrap();
         assert_eq!(domains[2].count(), 1);
         assert!(domains[2].contains(3));
+    }
+
+    #[test]
+    fn less_than_prunes_both_domains() {
+        // A in {1..5}, B in {1..5}, A < B → A loses 5, B loses 1
+        let mut domains = [const { Domain::<1>::empty() }; 2];
+        for v in 1..=5 { domains[0].insert(v); domains[1].insert(v); }
+        let c = LessThan::new(0, 1);
+        c.propagate(&mut domains).unwrap();
+        assert!(!domains[0].contains(5), "A should lose max(B)=5");
+        assert!(!domains[1].contains(1), "B should lose min(A)=1");
+        assert_eq!(domains[0].count(), 4); // {1,2,3,4}
+        assert_eq!(domains[1].count(), 4); // {2,3,4,5}
+    }
+
+    #[test]
+    fn less_than_tight_domains() {
+        // A={3}, B={3} → contradiction (3 < 3 is false)
+        let mut domains = [const { Domain::<1>::empty() }; 2];
+        domains[0].insert(3);
+        domains[1].insert(3);
+        let c = LessThan::new(0, 1);
+        assert!(c.propagate(&mut domains).is_err());
     }
 }
 
