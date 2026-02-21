@@ -4,7 +4,8 @@ use alloc::vec::Vec;
 use alloc::boxed::Box;
 use crate::domain::Domain;
 use crate::constraint::Constraint;
-use crate::config::SolverConfig;
+use crate::config::{Heuristic, SolverConfig};
+use crate::domain::DomainSnapshot;
 use crate::error::{Contradiction, SolveError};
 use crate::propagator::Propagator;
 use rand_core::RngCore;
@@ -71,7 +72,29 @@ impl<const W: usize> Solver<W> {
 
     /// Full solve: propagation + backtracking search.
     pub fn solve(&mut self, rng: &mut impl RngCore) -> Result<SolveResult, SolveError> {
-        todo!()
+        let mut rounds = 0usize;
+        let mut backtracks = 0usize;
+
+        // Initial propagation
+        let refs: Vec<&dyn Constraint<W>> = self.constraints.iter().map(|c| &**c).collect();
+        self.propagator.propagate(&mut self.domains, &refs)?;
+        rounds += 1;
+
+        if self.is_solved() {
+            return Ok(SolveResult {
+                solution: self.extract_solution(),
+                propagation_rounds: rounds,
+                backtracks: 0,
+            });
+        }
+
+        let max_depth = match self.config.backtrack {
+            crate::backtrack::BacktrackStrategy::None => 0,
+            crate::backtrack::BacktrackStrategy::Chronological { max_depth } => max_depth,
+            crate::backtrack::BacktrackStrategy::Restart { max_restarts } => max_restarts,
+        };
+
+        self.search(rng, &mut rounds, &mut backtracks, 0, max_depth)
     }
 
     /// Get the current domain of a variable.
@@ -92,6 +115,97 @@ impl<const W: usize> Solver<W> {
     /// Number of variables.
     pub fn num_variables(&self) -> usize {
         self.domains.len()
+    }
+
+    fn select_variable(&self) -> Option<usize> {
+        match self.config.heuristic {
+            Heuristic::MinDomain => {
+                self.domains.iter().enumerate()
+                    .filter(|(_, d)| !d.is_singleton() && !d.is_empty())
+                    .min_by_key(|(_, d)| d.count())
+                    .map(|(i, _)| i)
+            }
+            Heuristic::FirstUnsolved => {
+                self.domains.iter().enumerate()
+                    .find(|(_, d)| !d.is_singleton() && !d.is_empty())
+                    .map(|(i, _)| i)
+            }
+        }
+    }
+
+    fn extract_solution(&self) -> Solution {
+        Solution {
+            values: self.domains.iter().map(|d| d.singleton_value().unwrap()).collect(),
+        }
+    }
+
+    fn search(
+        &mut self,
+        rng: &mut impl RngCore,
+        rounds: &mut usize,
+        backtracks: &mut usize,
+        depth: usize,
+        max_depth: usize,
+    ) -> Result<SolveResult, SolveError> {
+        if depth > max_depth {
+            return Err(SolveError::BacktrackLimitExceeded);
+        }
+
+        let var = match self.select_variable() {
+            Some(v) => v,
+            None if self.is_solved() => {
+                return Ok(SolveResult {
+                    solution: self.extract_solution(),
+                    propagation_rounds: *rounds,
+                    backtracks: *backtracks,
+                });
+            }
+            None => return Err(SolveError::Unsatisfiable),
+        };
+
+        // Collect and shuffle values
+        let mut values: Vec<usize> = self.domains[var].iter().collect();
+        for i in (1..values.len()).rev() {
+            let j = (rng.next_u32() as usize) % (i + 1);
+            values.swap(i, j);
+        }
+
+        for value in values {
+            let snapshot = DomainSnapshot { domains: self.domains.clone() };
+
+            self.domains[var] = Domain::empty();
+            self.domains[var].insert(value);
+
+            let refs: Vec<&dyn Constraint<W>> = self.constraints.iter().map(|c| &**c).collect();
+            match self.propagator.propagate(&mut self.domains, &refs) {
+                Ok(_) => {
+                    *rounds += 1;
+                    if self.is_solved() {
+                        return Ok(SolveResult {
+                            solution: self.extract_solution(),
+                            propagation_rounds: *rounds,
+                            backtracks: *backtracks,
+                        });
+                    }
+                    match self.search(rng, rounds, backtracks, depth + 1, max_depth) {
+                        Ok(result) => return Ok(result),
+                        Err(SolveError::BacktrackLimitExceeded) => {
+                            return Err(SolveError::BacktrackLimitExceeded);
+                        }
+                        Err(_) => {
+                            *backtracks += 1;
+                            self.domains = snapshot.domains;
+                        }
+                    }
+                }
+                Err(_) => {
+                    *backtracks += 1;
+                    self.domains = snapshot.domains;
+                }
+            }
+        }
+
+        Err(SolveError::Unsatisfiable)
     }
 }
 
@@ -123,5 +237,31 @@ mod tests {
         let solved = solver.propagate().unwrap();
         assert!(solved);
         assert!(solver.is_solved());
+    }
+
+    #[test]
+    fn solve_simple_csp() {
+        // 3 vars {0,1,2}, all different → finds valid assignment
+        use rand::SeedableRng;
+        let mut solver = Solver::<1>::new(3, 3, SolverConfig::default());
+        solver.add_constraint(crate::constraint::AllDifferent::new(&[0, 1, 2]));
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
+        let result = solver.solve(&mut rng).unwrap();
+        let vals = &result.solution.values;
+        // All different and in range
+        assert_ne!(vals[0], vals[1]);
+        assert_ne!(vals[1], vals[2]);
+        assert_ne!(vals[0], vals[2]);
+        for &v in vals { assert!(v < 3); }
+    }
+
+    #[test]
+    fn solve_unsatisfiable() {
+        // 3 vars {0,1}, all different → impossible
+        use rand::SeedableRng;
+        let mut solver = Solver::<1>::new(3, 2, SolverConfig::default());
+        solver.add_constraint(crate::constraint::AllDifferent::new(&[0, 1, 2]));
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
+        assert!(solver.solve(&mut rng).is_err());
     }
 }
