@@ -241,6 +241,22 @@ mod tests {
         assert!(!domains[1].contains(5));
         assert!(!domains[2].contains(5));
     }
+
+    #[test]
+    fn table_prunes_inconsistent_values() {
+        // 2 vars, allowed: (0,1), (1,0). var0={0,1,2}, var1={0,1,2}
+        // After propagation: var0={0,1}, var1={0,1} (2 removed from both)
+        let mut domains = alloc::vec![Domain::<1>::full(3); 2];
+        let c = Table::new(
+            &[0, 1],
+            std::vec![std::vec![0, 1], std::vec![1, 0]],
+        );
+        c.propagate(&mut domains).unwrap();
+        assert!(!domains[0].contains(2));
+        assert!(!domains[1].contains(2));
+        assert!(domains[0].contains(0));
+        assert!(domains[0].contains(1));
+    }
 }
 
 /// Exactly N variables in scope must take a specific value.
@@ -327,7 +343,30 @@ impl<const W: usize> Constraint<W> for Table {
     }
 
     fn propagate(&self, domains: &mut [Domain<W>]) -> Result<(), Contradiction> {
-        todo!()
+        let n = self.variables.len();
+        let mut allowed_vals: Vec<Domain<W>> = (0..n).map(|_| Domain::empty()).collect();
+
+        for tuple in &self.allowed {
+            // Check if this tuple is consistent with current domains
+            let consistent = tuple.iter().enumerate().all(|(i, &val)| {
+                domains[self.variables[i]].contains(val)
+            });
+            if consistent {
+                for (i, &val) in tuple.iter().enumerate() {
+                    allowed_vals[i].insert(val);
+                }
+            }
+        }
+
+        // Intersect each variable's domain with its allowed values
+        for (i, &v) in self.variables.iter().enumerate() {
+            domains[v].intersect_with(&allowed_vals[i]);
+            if domains[v].is_empty() {
+                return Err(Contradiction { variable: v });
+            }
+        }
+
+        Ok(())
     }
 }
 
