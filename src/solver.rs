@@ -50,12 +50,18 @@ impl<const W: usize> Solver<W> {
 
     /// Fix a variable to a specific value.
     pub fn assign(&mut self, variable: usize, value: usize) -> Result<(), Contradiction> {
-        todo!()
+        self.domains[variable] = Domain::empty();
+        self.domains[variable].insert(value);
+        let refs: Vec<&dyn Constraint<W>> = self.constraints.iter().map(|c| &**c).collect();
+        self.propagator.propagate(&mut self.domains, &refs)?;
+        Ok(())
     }
 
     /// Run propagation only (no search).
     pub fn propagate(&mut self) -> Result<bool, Contradiction> {
-        todo!()
+        let refs: Vec<&dyn Constraint<W>> = self.constraints.iter().map(|c| &**c).collect();
+        self.propagator.propagate(&mut self.domains, &refs)?;
+        Ok(self.is_solved())
     }
 
     /// Run incremental propagation after adding new constraints.
@@ -86,5 +92,36 @@ impl<const W: usize> Solver<W> {
     /// Number of variables.
     pub fn num_variables(&self) -> usize {
         self.domains.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    extern crate std;
+    use super::*;
+    use crate::constraint::NotEqual;
+    use crate::config::SolverConfig;
+
+    #[test]
+    fn assign_propagates() {
+        // 2 vars {0,1,2}, A!=B, assign A=1 → B loses 1
+        let mut solver = Solver::<1>::new(2, 3, SolverConfig::default());
+        solver.add_constraint(NotEqual::new(0, 1));
+        solver.assign(0, 1).unwrap();
+        assert_eq!(solver.domain(0).singleton_value(), Some(1));
+        assert!(!solver.domain(1).contains(1));
+        assert_eq!(solver.domain(1).count(), 2);
+    }
+
+    #[test]
+    fn propagate_returns_solved() {
+        // 2 vars, assign both → is_solved
+        let mut solver = Solver::<1>::new(2, 3, SolverConfig::default());
+        solver.add_constraint(NotEqual::new(0, 1));
+        solver.assign(0, 0).unwrap();
+        solver.assign(1, 1).unwrap();
+        let solved = solver.propagate().unwrap();
+        assert!(solved);
+        assert!(solver.is_solved());
     }
 }
