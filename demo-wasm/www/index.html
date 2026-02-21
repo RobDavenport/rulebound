@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>rulebound - Interactive Constraint Solver</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <header class="sidebar-header">
+                <h1>rulebound</h1>
+                <p class="subtitle">Interactive Constraint Solver</p>
+            </header>
+
+            <section class="controls">
+                <div class="control-group">
+                    <label for="mode-select">Mode</label>
+                    <select id="mode-select">
+                        <option value="sudoku">Sudoku</option>
+                        <option value="map-coloring">Map Coloring</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="seed-input">Seed</label>
+                    <input type="number" id="seed-input" value="42" min="0" max="999999">
+                </div>
+
+                <div class="button-row">
+                    <button id="btn-generate" class="btn btn-primary">Generate</button>
+                    <button id="btn-step" class="btn">Step</button>
+                    <button id="btn-autoplay" class="btn">Auto-play</button>
+                </div>
+
+                <div class="button-row">
+                    <button id="btn-reset" class="btn btn-secondary">Reset</button>
+                </div>
+            </section>
+
+            <section class="stats">
+                <h2>Stats</h2>
+                <div class="stat-row">
+                    <span class="stat-label">Variables</span>
+                    <span class="stat-value" id="stat-variables">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Constraints</span>
+                    <span class="stat-value" id="stat-constraints">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Propagations</span>
+                    <span class="stat-value" id="stat-propagations">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Backtracks</span>
+                    <span class="stat-value" id="stat-backtracks">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Solve time</span>
+                    <span class="stat-value" id="stat-time">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Status</span>
+                    <span class="stat-value" id="stat-status">Ready</span>
+                </div>
+            </section>
+
+            <div id="message" class="message"></div>
+
+            <footer class="footer">
+                <p>
+                    <a href="https://github.com/robdavenport/rulebound" target="_blank">GitHub</a>
+                    &middot;
+                    <a href="https://crates.io/crates/rulebound" target="_blank">crates.io</a>
+                </p>
+            </footer>
+        </aside>
+
+        <!-- Main canvas area -->
+        <main class="canvas-container">
+            <canvas id="canvas" width="720" height="720"></canvas>
+        </main>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>

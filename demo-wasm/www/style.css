@@ -1,0 +1,275 @@
+/* rulebound demo — dark theme, sidebar + canvas layout */
+/* Based on wavfc style */
+
+/* ── Reset ─────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ── Variables ─────────────────────────────────────────────── */
+:root {
+    --bg:           #0e0e1a;
+    --surface:      #16162a;
+    --surface-alt:  #1e1e38;
+    --border:       #2a2a4a;
+    --text:         #c8c8e0;
+    --text-dim:     #7878a0;
+    --accent:       #5566ff;
+    --accent-hover: #6677ff;
+    --btn-bg:       #2a2a4a;
+    --btn-hover:    #3a3a5a;
+    --success:      #44cc88;
+    --error:        #cc4444;
+    --warning:      #ccaa44;
+    --sidebar-w:    300px;
+    --radius:       6px;
+    --font-mono:    'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --font-sans:    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ── Base ──────────────────────────────────────────────────── */
+html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+/* ── App layout ────────────────────────────────────────────── */
+.app {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────── */
+.sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    overflow-y: auto;
+    gap: 20px;
+}
+
+.sidebar-header h1 {
+    font-family: var(--font-mono);
+    font-size: 1.6rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+}
+
+.sidebar-header .subtitle {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-top: 2px;
+}
+
+/* ── Controls ──────────────────────────────────────────────── */
+.controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.control-group label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+select,
+input[type="number"],
+input[type="text"] {
+    background: var(--surface-alt);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+select:focus,
+input:focus {
+    border-color: var(--accent);
+}
+
+/* ── Buttons ───────────────────────────────────────────────── */
+.button-row {
+    display: flex;
+    gap: 8px;
+}
+
+.btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--btn-bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.btn:hover {
+    background: var(--btn-hover);
+    border-color: var(--accent);
+}
+
+.btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background: var(--accent-hover);
+}
+
+.btn-secondary {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text-dim);
+}
+
+.btn-secondary:hover {
+    background: var(--surface-alt);
+    color: var(--text);
+}
+
+/* ── Stats ─────────────────────────────────────────────────── */
+.stats {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.stats h2 {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+}
+
+.stat-label {
+    color: var(--text-dim);
+}
+
+.stat-value {
+    color: var(--text);
+}
+
+/* ── Message ───────────────────────────────────────────────── */
+.message {
+    display: none;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    word-break: break-word;
+}
+
+/* ── Canvas container ──────────────────────────────────────── */
+.canvas-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    overflow: hidden;
+    padding: 20px;
+}
+
+.canvas-container canvas {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* ── Footer ────────────────────────────────────────────────── */
+.footer {
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .app {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        min-width: unset;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        max-height: 40vh;
+        padding: 14px;
+        gap: 12px;
+    }
+
+    .canvas-container {
+        flex: 1;
+        padding: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .sidebar-header h1 {
+        font-size: 1.2rem;
+    }
+
+    .btn {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+    }
+}
