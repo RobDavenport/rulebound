@@ -16,23 +16,23 @@ let domains = Array(81).fill(null).map(() => [1,2,3,4,5,6,7,8,9]);
 let givens = Array(81).fill(false);
 let selectedCell = -1;
 
-// Map coloring state
-const AUSTRALIA = {
-    nodes: ['WA','NT','SA','Q','NSW','V','T'],
+// Map coloring state (classic 7-region sample graph)
+const SAMPLE_MAP = {
+    nodes: ['A','B','C','D','E','F','G'],
     positions: [
-        [120, 350], // WA
-        [320, 150], // NT
-        [320, 350], // SA
-        [500, 150], // Q
-        [500, 320], // NSW
-        [440, 460], // V
-        [500, 560], // T
+        [120, 350], // A
+        [320, 150], // B
+        [320, 350], // C
+        [500, 150], // D
+        [500, 320], // E
+        [440, 460], // F
+        [500, 560], // G
     ],
     edges: [[0,1],[0,2],[1,2],[1,3],[2,3],[2,4],[2,5],[3,4],[4,5]],
     colors: 3,
 };
-let mapColors = Array(7).fill(-1); // -1 = uncolored
-let mapDomains = Array(7).fill(null).map(() => [0,1,2]);
+let mapColors = Array(SAMPLE_MAP.nodes.length).fill(-1); // -1 = uncolored
+let mapDomains = Array(SAMPLE_MAP.nodes.length).fill(null).map(() => [0,1,2]);
 
 let stats = { variables: 0, constraints: 27, propagations: 0, backtracks: 0, time: '--', status: 'Ready' };
 
@@ -119,7 +119,7 @@ function drawMapColoring() {
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-    const g = AUSTRALIA;
+    const g = SAMPLE_MAP;
 
     // Draw edges
     ctx.strokeStyle = COLORS.gridLine;
@@ -173,7 +173,7 @@ function drawMapColoring() {
     ctx.font = '16px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText('Australia Map Coloring', CANVAS_SIZE / 2, 20);
+    ctx.fillText('Graph Coloring (7-node sample)', CANVAS_SIZE / 2, 20);
 }
 
 function drawGrid() {
@@ -200,14 +200,14 @@ function resetSudoku() {
 }
 
 function resetMapColoring() {
-    mapColors = Array(AUSTRALIA.nodes.length).fill(-1);
-    mapDomains = Array(AUSTRALIA.nodes.length).fill(null).map(() =>
-        Array.from({length: AUSTRALIA.colors}, (_, i) => i)
+    mapColors = Array(SAMPLE_MAP.nodes.length).fill(-1);
+    mapDomains = Array(SAMPLE_MAP.nodes.length).fill(null).map(() =>
+        Array.from({length: SAMPLE_MAP.colors}, (_, i) => i)
     );
     selectedCell = -1;
     stepSolver = null;
     stopAutoplay();
-    stats = { variables: AUSTRALIA.nodes.length, constraints: AUSTRALIA.edges.length, propagations: 0, backtracks: 0, time: '--', status: 'Ready' };
+    stats = { variables: SAMPLE_MAP.nodes.length, constraints: SAMPLE_MAP.edges.length, propagations: 0, backtracks: 0, time: '--', status: 'Ready' };
     updateStats(stats);
     drawGrid();
     setMessage('Click a node to cycle colors, then Solve or Step.');
@@ -224,7 +224,7 @@ function resetGrid() {
 function generate() {
     if (currentMode !== 'sudoku') {
         resetMapColoring();
-        setMessage('Map Coloring mode: click Solve or Step to color the graph.');
+        setMessage('Graph Coloring mode: click Solve or Step to color the sample graph.');
         return;
     }
 
@@ -232,7 +232,10 @@ function generate() {
     const t0 = performance.now();
 
     try {
-        const resultJson = solve_sudoku('[' + Array(81).fill(0).join(',') + ']');
+        const resultJson = solve_sudoku(JSON.stringify({
+            puzzle: Array(81).fill(0),
+            seed,
+        }));
         const result = JSON.parse(resultJson);
 
         if (result.status === 'solved') {
@@ -274,10 +277,12 @@ function generate() {
 function solveSudoku() {
     const seed = parseInt(document.getElementById('seed-input').value, 10) || 42;
     const t0 = performance.now();
-    const puzzleArray = '[' + grid.join(',') + ']';
 
     try {
-        const resultJson = solve_sudoku(puzzleArray);
+        const resultJson = solve_sudoku(JSON.stringify({
+            puzzle: grid,
+            seed,
+        }));
         const result = JSON.parse(resultJson);
 
         if (result.status === 'solved') {
@@ -306,7 +311,7 @@ function solveMapColoringInstant() {
     const seed = parseInt(document.getElementById('seed-input').value, 10) || 42;
     const t0 = performance.now();
 
-    const g = AUSTRALIA;
+    const g = SAMPLE_MAP;
     const config = JSON.stringify({
         nodes: g.nodes.length,
         colors: g.colors,
@@ -361,9 +366,8 @@ function stepSolve() {
 
 function stepSolveSudoku() {
     if (!stepSolver) {
-        const puzzleArray = '[' + grid.join(',') + ']';
         const seed = parseInt(document.getElementById('seed-input').value, 10) || 42;
-        stepSolver = new StepSolver(JSON.stringify({ puzzle: puzzleArray, seed }));
+        stepSolver = new StepSolver(JSON.stringify({ puzzle: grid, seed }));
         updateFromSudokuSolver();
     }
 
@@ -411,7 +415,7 @@ function updateFromSudokuSolver() {
 function stepSolveMap() {
     if (!stepSolver) {
         const seed = parseInt(document.getElementById('seed-input').value, 10) || 42;
-        const g = AUSTRALIA;
+        const g = SAMPLE_MAP;
         const config = JSON.stringify({
             nodes: g.nodes.length,
             colors: g.colors,
@@ -523,7 +527,7 @@ function handleSudokuClick(x, y) {
 }
 
 function handleMapClick(x, y) {
-    const g = AUSTRALIA;
+    const g = SAMPLE_MAP;
     const nodeRadius = 30;
 
     for (let i = 0; i < g.nodes.length; i++) {

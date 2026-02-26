@@ -33,14 +33,58 @@ fn setup_sudoku() -> Solver<1> {
     solver
 }
 
-/// Parse a JSON array of integers. 0 means empty, 1-9 are given values.
+/// Parse Sudoku cells from either:
+/// - a raw JSON array: `[0,0,...]`
+/// - an object containing a puzzle array/string: `{"puzzle":[...],"seed":42}`
 fn parse_puzzle(json: &str) -> Vec<u8> {
-    let trimmed = json.trim();
+    extract_array_for_key(json, "\"puzzle\"")
+        .or_else(|| extract_first_array(json))
+        .map(parse_puzzle_array)
+        .unwrap_or_default()
+}
+
+fn parse_puzzle_array(array_json: &str) -> Vec<u8> {
+    let trimmed = array_json.trim();
     let inner = trimmed.strip_prefix('[').unwrap_or(trimmed);
     let inner = inner.strip_suffix(']').unwrap_or(inner);
     inner.split(',')
-        .map(|s| s.trim().parse::<u8>().unwrap_or(0))
+        .map(|s| s.trim().trim_matches('"').parse::<u8>().unwrap_or(0))
         .collect()
+}
+
+fn extract_array_for_key<'a>(json: &'a str, key: &str) -> Option<&'a str> {
+    let key_pos = json.find(key)?;
+    let after_key = &json[key_pos + key.len()..];
+    let rel_start = after_key.find('[')?;
+    extract_balanced_array(&json[key_pos + key.len() + rel_start..])
+}
+
+fn extract_first_array(json: &str) -> Option<&str> {
+    let start = json.find('[')?;
+    extract_balanced_array(&json[start..])
+}
+
+fn extract_balanced_array(s: &str) -> Option<&str> {
+    let bytes = s.as_bytes();
+    if bytes.first().copied()? != b'[' {
+        return None;
+    }
+
+    let mut depth = 0usize;
+    for (idx, &b) in bytes.iter().enumerate() {
+        match b {
+            b'[' => depth += 1,
+            b']' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(&s[..=idx]);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
 }
 
 /// Format solution as JSON array of values (1-indexed for display).
@@ -670,6 +714,34 @@ impl MapStepSolver {
                 return self.step();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_puzzle_from_raw_array() {
+        let cells = parse_puzzle("[1,0,9]");
+        assert_eq!(cells, vec![1, 0, 9]);
+    }
+
+    #[test]
+    fn parse_puzzle_from_object_array() {
+        let cells = parse_puzzle(r#"{"puzzle":[1,0,9],"seed":7}"#);
+        assert_eq!(cells, vec![1, 0, 9]);
+    }
+
+    #[test]
+    fn parse_puzzle_from_object_string_array() {
+        let cells = parse_puzzle(r#"{"puzzle":"[1,0,9]","seed":7}"#);
+        assert_eq!(cells, vec![1, 0, 9]);
+    }
+
+    #[test]
+    fn extract_seed_from_object() {
+        assert_eq!(extract_seed(r#"{"puzzle":[0,0,0],"seed":1234}"#), 1234);
     }
 }
 
