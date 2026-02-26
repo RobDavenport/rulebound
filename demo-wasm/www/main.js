@@ -1,7 +1,7 @@
 // rulebound interactive constraint solver demo
 // ES6 module entry point — Sudoku + Map Coloring modes
 
-import init, { solve_sudoku, solve_demo, StepSolver, solve_map_coloring, MapStepSolver } from '../pkg/rulebound_demo.js';
+import init, { solve_sudoku, solve_demo, StepSolver, solve_map_coloring, MapStepSolver } from './pkg/rulebound_demo.js';
 
 // --- State ---
 let canvas, ctx;

@@ -2,7 +2,13 @@
 
 A lightweight, `no_std` constraint propagation solver for real-time game logic and procedural verification.
 
-**[Live Demo](https://robdavenport.github.io/rulebound/)**
+**Live Demo (WASM + GitHub Pages): [https://robdavenport.github.io/rulebound/](https://robdavenport.github.io/rulebound/)**
+
+## WASM Demo Site
+
+- Demo app source: `demo-wasm/`
+- GitHub Pages deploy workflow: `.github/workflows/deploy-pages.yml` (runs on push to `main`)
+- If you are publishing from a fork, use `https://<your-github-username>.github.io/rulebound/`
 
 ## Features
 
